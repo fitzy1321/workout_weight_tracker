@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, date
 from tinydb.middlewares import Middleware
 from tinydb import TinyDB
 from typing import Type
@@ -45,6 +45,15 @@ class DateTimeSerializer(Serializer):
     def decode(self, s):
         return datetime.fromisoformat(s)
 
+
+class DateSerializer(Serializer):
+    OBJ_CLASS = date  # The class this serializer handles
+
+    def encode(self, obj):
+        return obj.isoformat()
+
+    def decode(self, s):
+        return date.fromisoformat(s)
 
 def _enumerate_element(element):
     """

@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.14"
+__generated_with = "0.14.15"
 app = marimo.App(width="columns")
 
 
@@ -8,7 +8,7 @@ app = marimo.App(width="columns")
 def _():
     import marimo as mo
     import polars as pl
-    from datetime import datetime
+    from datetime import date, datetime
     import uuid
     return datetime, mo, pl, uuid
 
@@ -17,13 +17,12 @@ def _():
 def _():
     from enum import StrEnum
 
+    CONVERSION_VALUE = 2.2046
+
 
     class WeightUnits(StrEnum):
         POUNDS = "lbs"
         KILOS = "kg"
-
-
-    CONVERSION_VALUE = 2.2046
 
 
     def lbs_to_kg(lbs):
@@ -34,7 +33,7 @@ def _():
     def kg_to_lbs(kg):
         x = float(kg) * CONVERSION_VALUE
         return round(x, 2)
-    return (WeightUnits,)
+    return WeightUnits, lbs_to_kg, kg_to_lbs
 
 
 @app.cell
@@ -54,10 +53,37 @@ def _(pl):
 
 
 @app.cell(column=1, hide_code=True)
-def _(WeightUnits, mo):
+def _(WeightUnits, lbs_to_kg, kg_to_lbs, mo):
     # Not Sure which to start with.
     # Lets get text from marimo.ui.text
     # Wonder if I can integrate server suggestions from it, like fuzzing or something?
+    weight_text = mo.ui.text(label=f"Enter Weight")
+
+    unit_radio = mo.ui.radio(
+        options=[WeightUnits.POUNDS, WeightUnits.KILOS],
+        value=WeightUnits.POUNDS,
+        label="Pounds or Kilograms?",
+        # on_change=conversions,
+    )
+
+
+    # Define the callback, referencing the widgets
+    def conversions(event):
+        # Update label and placeholder based on selected unit
+        if not weight_text.value:
+            return
+
+        try:
+            x = float(weight_text.value)
+        except:
+            return
+        if event == WeightUnits.KILOS:
+            weight_text.value = lbs_to_kg(x)
+        elif event == WeightUnits.POUNDS:
+            weight_text.text = kg_to_lbs(x)
+
+    unit_radio._on_change = conversions
+
     weight_form = (
         mo.md(
             """
@@ -68,14 +94,7 @@ def _(WeightUnits, mo):
         {weight}
         """
         )
-        .batch(
-            units=mo.ui.radio(
-                options=[WeightUnits.POUNDS, WeightUnits.KILOS],
-                value=WeightUnits.POUNDS,
-                label="Pounds or Kilograms?",
-            ),
-            weight=mo.ui.text(label="Enter Weight here"),
-        )
+        .batch(units=unit_radio, weight=weight_text)
         .form()
     )
 
@@ -84,7 +103,7 @@ def _(WeightUnits, mo):
 
 
 @app.cell
-def _(WeightDB, datetime, load_df, mo, upsert, uuid, weight_form):
+def _(WeightDB, datetime, mo, upsert, uuid, weight_form):
     units, weight_str = weight_form.element.value.values()
     # weight must have a value, to construct dataframe
     mo.stop(not weight_str, "Enter Weight before running cell.")
@@ -99,11 +118,16 @@ def _(WeightDB, datetime, load_df, mo, upsert, uuid, weight_form):
         "id": str(uuid.uuid4()),
         "weight": weight,
         "unit": units,
-        "created": datetime.now(),
+        "created": datetime.now().date(),
     }
 
     # save updates and present dataframe ...
-    upsert(new_data, WeightDB)
+    upsert(new_data, WeightDB, key="created")
+    return
+
+
+@app.cell
+def _(WeightDB, load_df):
     weight_df = load_df(WeightDB)
     weight_df
     return
