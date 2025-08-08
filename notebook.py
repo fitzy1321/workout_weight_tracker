@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.15"
+__generated_with = "0.14.16"
 app = marimo.App(width="columns")
 
 
@@ -10,7 +10,8 @@ def _():
     import polars as pl
     from datetime import date, datetime
     import uuid
-    return datetime, mo, pl, uuid
+    import altair as alt
+    return alt, datetime, mo, pl, uuid
 
 
 @app.cell
@@ -33,7 +34,7 @@ def _():
     def kg_to_lbs(kg):
         x = float(kg) * CONVERSION_VALUE
         return round(x, 2)
-    return WeightUnits, lbs_to_kg, kg_to_lbs
+    return WeightUnits, kg_to_lbs, lbs_to_kg
 
 
 @app.cell
@@ -53,7 +54,7 @@ def _(pl):
 
 
 @app.cell(column=1, hide_code=True)
-def _(WeightUnits, lbs_to_kg, kg_to_lbs, mo):
+def _(WeightUnits, kg_to_lbs, lbs_to_kg, mo):
     # Not Sure which to start with.
     # Lets get text from marimo.ui.text
     # Wonder if I can integrate server suggestions from it, like fuzzing or something?
@@ -81,6 +82,7 @@ def _(WeightUnits, lbs_to_kg, kg_to_lbs, mo):
             weight_text.value = lbs_to_kg(x)
         elif event == WeightUnits.POUNDS:
             weight_text.text = kg_to_lbs(x)
+
 
     unit_radio._on_change = conversions
 
@@ -130,29 +132,23 @@ def _(WeightDB, datetime, mo, upsert, uuid, weight_form):
 def _(WeightDB, load_df):
     weight_df = load_df(WeightDB)
     weight_df
-    return
+    return (weight_df,)
 
 
 @app.cell
-def _(mo):
-    mo.md(
-        """
-    How the fuck do I want to collect exercise data?
-    How is it going to be visulized and possibly morphed into usable data?
-
-    What usable data do I need?
-
-    - The name
-    - The sets
-    - The reps
-    - The weights
-    - The date / maybe session?
-        - that implies recording session data, what does that mean?
-
-
-    Track how the 3 sets of numbers change and relate, across time?
-    """
+def _(alt, mo, pl, weight_df):
+    filtered_df = weight_df.select(
+        pl.col("weight").alias("Weight"), pl.col("created").alias("Date")
     )
+    chart = mo.ui.altair_chart(
+        alt.Chart(filtered_df).mark_line().encode(x="Date", y="Weight")
+    )
+    return (chart,)
+
+
+@app.cell
+def _(chart, mo):
+    mo.vstack([chart, mo.ui.table(chart.value)])
     return
 
 
